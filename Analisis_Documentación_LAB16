@@ -329,3 +329,50 @@ Efectividad del Bloqueo a Nivel TCP (Capa 4): La regla basada en el módulo conn
 Efectividad del Bloqueo por Firma (Capa 7): El motor de inspección profunda de paquetes del Kernel detectó con exactitud matemática el intento del script automatizado del atacante por extraer información. Se registraron 90 paquetes descartados con éxito que contenían de forma exacta la cadena "GET /db.sql" (12,150 bytes filtrados de raíz).
 
 Diagnóstico del Éxito Defensivo: La combinación de ambas políticas impidió que el ataque de inundación congestionara los sockets del servidor y forzó al script automatizado de descargas a quedar completamente inoperante. Las métricas confirman que el ataque fue contenido de manera limpia en el Espacio de Kernel sin comprometer el hardware ni interrumpir el acceso a clientes legítimos.
+
+FASE 4: Ejecutar el Plan (HP Paso 4)
+1. Implementación Manual de las Reglas de Mitigación
+Con el fin de mitigar los incidentes de forma quirúrgica en el Espacio de Kernel sin apagar los servicios, se aplicó secuencialmente la configuración normativa recomendada por la guía de laboratorio:
+
+A. Limpieza de Tablas del Firewall
+Bash
+sudo iptables -F
+Impacto: Se vaciaron las reglas activas previas en las cadenas de la tabla filter, asegurando un entorno predecible y limpio para el despliegue de las contramedidas.
+
+B. Contramedida de Capa 4: Rate Limiting por Tasa (limit)
+Bash
+sudo iptables -A INPUT -p tcp --syn --dport 80 -m limit --limit 10/s -j ACCEPT
+sudo iptables -A INPUT -p tcp --syn --dport 80 -j DROP
+Impacto: Este par de reglas establece un límite estricto de tráfico entrante hacia el puerto HTTP. Permite una tasa máxima sostenida de 10 peticiones SYN por segundo con una ráfaga (burst) inicial tolerada de 5. Todo paquete SYN excedente es interceptado y destruído (DROP), neutralizando los intentos del ataque de inundación por agotar los sockets disponibles.
+
+C. Contramedida de Capa 7: Inspección y Filtrado por Cadena (string)
+Bash
+sudo iptables -A INPUT -p tcp --dport 80 -m string --string "db.sql" --algo bm -j DROP
+Impacto: Utilizando el algoritmo de coincidencia de patrones Boyer-Moore (bm), el Kernel inspecciona la capa de aplicación de los paquetes dirigidos al puerto 80. Al identificar la cadena de texto exacta "db.sql", el firewall asume una descarga maliciosa automatizada y destruye el paquete en milisegundos.
+
+2. Análisis Métrico de Resultados en el Firewall
+Tras la inyección manual de las directivas, se listaron los contadores de tráfico del Kernel para evaluar el rendimiento defensivo:
+
+Bash
+sudo iptables -L -n -v
+
+Evidencia Registrada de la Consola
+Plaintext
+Chain INPUT (policy ACCEPT 136K packets, 6364K bytes)
+ pkts bytes target     prot opt in     out     source               destination
+  291 15560 ACCEPT     tcp  --  * * 0.0.0.0/0            0.0.0.0/0            tcp dpt:80 flags:0x17/0x02 limit: avg 10/sec burst 5
+ 1497 63300 DROP       tcp  --  * * 0.0.0.0/0            0.0.0.0/0            tcp dpt:80 flags:0x17/0x02
+  780  105K DROP       tcp  --  * * 0.0.0.0/0            0.0.0.0/0            tcp dpt:80 STRING match "db.sql" ALGO name bm
+
+Control del SYN Flood (Capa 4): El firewall permitió el ingreso de 291 paquetes legítimos (15,560 bytes) que se ajustaban al comportamiento normal, mientras que detectó y eliminó de manera fulminante 1,497 paquetes excedentes (63,300 bytes) provocados por las IPs falsificadas. Esto descongestionó la memoria de red del servidor de inmediato.
+
+Freno a la Extracción (Capa 7): El motor de firmas interceptó con éxito 780 paquetes hostiles (105 KB bloqueados en tránsito) que intentaban solicitar o extraer el archivo pesado del juego. Con esto se detuvo por completo el script automatizado del atacante, liberando el ancho de banda saliente del servidor web.
+
+3. Diagnóstico de Disponibilidad en el Cliente (Navegador Host)
+Con las reglas activas filtrando la amenaza en el Kernel, se ingresó desde la máquina externa a la dirección IP del servidor:
+
+Plaintext
+http://10.160.10.200
+Resultado Operativo: El juego interactivo 2048 vuelve a renderizarse fluidamente y de manera completa. El tiempo de carga regresó a los valores óptimos nominales, respondiendo instantáneamente a las interacciones del usuario.
+
+Conclusión de la Fase 4: La ejecución de la estrategia defensiva combinada ha demostrado una efectividad del 100%. El servidor fue recuperado exitosamente en caliente: la tasa de tráfico SYN nocivo quedó contenida y la descarga fraudulenta del recurso crítico fue totalmente deshabilitada, restaurando la disponibilidad completa del servicio legítimo.
