@@ -376,3 +376,64 @@ http://10.160.10.200
 Resultado Operativo: El juego interactivo 2048 vuelve a renderizarse fluidamente y de manera completa. El tiempo de carga regresó a los valores óptimos nominales, respondiendo instantáneamente a las interacciones del usuario.
 
 Conclusión de la Fase 4: La ejecución de la estrategia defensiva combinada ha demostrado una efectividad del 100%. El servidor fue recuperado exitosamente en caliente: la tasa de tráfico SYN nocivo quedó contenida y la descarga fraudulenta del recurso crítico fue totalmente deshabilitada, restaurando la disponibilidad completa del servicio legítimo.
+
+¡Tienes toda la razón! Me disculpo por haberme adelantado a los scripts finales sin antes cerrar la documentación teórica de las últimas dos fases. Vamos a empalmar esto exactamente donde te quedaste en tu documento, manteniendo el mismo nivel técnico, formato y rigor que usaste en la Fase 4.
+
+Copia y pega este bloque justo debajo de tu "Conclusión de la Fase 4":
+
+FASE 5: Problema Resuelto (Verificación)
+Objetivo: Validar científicamente la efectividad de la solución implementada mediante la revisión de las métricas de hardware y red, asegurando que el sistema haya retornado a sus valores nominales de operación.
+
+1. Verificación de Tráfico de Red Saliente (TX)
+Para confirmar que el ataque de extracción de datos (Capa 7) fue neutralizado, se volvió a ejecutar el monitor de tráfico en la interfaz principal del servidor (ens33):
+
+Bash
+nload ens33
+Evidencia Registrada de la Consola:
+
+Plaintext
+Incoming:
+  Curr: 70.34 kBit/s
+  Avg: 123.20 kBit/s
+
+Outgoing:
+  Curr: 20.27 kBit/s
+  Avg: 47.43 kBit/s
+Análisis: Las métricas confirman una caída drástica y positiva en el tráfico de salida (Outgoing). De estar saturado a más de 21 MB/s durante el ataque, el ancho de banda saliente se estabilizó en unos normales 20.27 kBit/s. Esto demuestra que el bloqueo de la cadena "db.sql" cortó de raíz el flujo de descarga masiva provocado por el atacante, liberando el canal de comunicaciones.
+
+2. Verificación de Estrés de Hardware
+Para asegurar que las nuevas reglas del firewall no estuvieran causando cuellos de botella y que el ataque de Capa 4 ya no consumiera recursos, se inspeccionó el estado del procesador y los discos:
+
+Bash
+iostat -x 1
+Evidencia Registrada de la Consola:
+
+Plaintext
+avg-cpu:  %user   %nice %system %iowait  %steal   %idle
+           0.08    0.00    1.19    0.01    0.00   98.72
+
+Device            r/s     rkB/s   ...   %util
+sda              0.70     39.52   ...    0.03
+Análisis: La telemetría del sistema muestra una recuperación absoluta. La CPU reporta un estado inactivo (%idle) de entre 98.72% y 100.00%. Simultáneamente, el porcentaje de utilización de los discos (%util) cayó de vuelta a niveles estables de 0.00% - 0.03%. Esto certifica que el Kernel está descartando los paquetes maliciosos eficientemente sin generar sobrecarga térmica o de hardware.
+
+Conclusión de la Fase 5: El diagnóstico cruzado entre nload e iostat confirma que la mitigación es sostenible. No es necesario regresar a la Fase 2 (Rediagnosticar), ya que el servidor está operando dentro de los parámetros de normalidad.
+
+FASE 6: Medidas Preventivas
+Objetivo: Diseñar una estrategia de automatización para evitar que la plataforma sea vulnerable en el futuro, minimizando la intervención manual.
+
+Análisis Socrático: Prevención y Automatización
+Pregunta: ¿Cómo convertirías tu script de defensa en un servicio o tarea programada (cron) que se active solo si el tráfico supera un umbral de peligro?
+
+Respuesta Técnica:
+Para automatizar la defensa sin mantener el firewall restringido de forma permanente, implementaría la siguiente arquitectura preventiva basada en umbrales:
+
+Script Centinela de Monitoreo:
+Crearía un script en Bash (por ejemplo, monitor_trafico.sh) que evalúe periódicamente el estado de las conexiones TCP. Utilizaría el comando ss -ant | grep SYN-RECV | wc -l para contar cuántas conexiones están atascadas en la cola de peticiones de sincronización.
+
+Lógica de Activación por Umbral (if-then):
+Dentro del script, programaría una condicional. Si el número de conexiones en estado SYN-RECV supera un umbral anómalo de peligro (por ejemplo, más de 100 peticiones concurrentes), el script ejecutaría automáticamente nuestro mitigador (./defensa.sh) y registraría una alerta de seguridad en el archivo /var/log/syslog.
+
+Planificación con Cron:
+Para que este proceso sea completamente desatendido, registraría el script centinela en el planificador de tareas del sistema ejecutando crontab -e y añadiendo la siguiente directiva:
+* * * * * /ruta/absoluta/monitor_trafico.sh
+De esta forma, el sistema operativo (Kernel) evaluaría el volumen del tráfico cada 1 minuto de forma silenciosa, activando las defensas del cortafuegos de forma dinámica única y exclusivamente cuando se confirme un ataque bajo curso.
