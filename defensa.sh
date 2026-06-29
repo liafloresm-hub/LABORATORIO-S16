@@ -2,6 +2,7 @@
 #!/bin/bash
 # ==========================================
 # Script de Mitigación Híbrida (Capa 4 y 7)
+# Autor: Lia Flores - Lab S16
 # ==========================================
 
 echo "[*] Vaciando reglas previas de iptables (Idempotencia)..."
