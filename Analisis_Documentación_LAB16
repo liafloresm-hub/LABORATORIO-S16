@@ -150,8 +150,6 @@ Correlación de Impacto: Cada descarga exitosa obliga a Apache a despachar un ob
 
 Conclusión de Inteligencia: Mientras que el ataque SYN Flood en el puerto 80 busca agotar la tabla de conexiones del Kernel usando IPs falsas aleatorias, la IP real del atacante (10.160.10.100) está simultáneamente extrayendo y forzando la descarga en bucle del archivo db.sql para saturar el ancho de banda saliente. Hemos identificado con precisión el objetivo IP a mitigar.
 
-¡Excelente captura de htop! Este resultado es súper interesante porque nos muestra un comportamiento muy particular de este tipo de incidentes. Vamos a estructurar la documentación técnica de esta sección para tu reporte.
-
 4. Uso de CPU y Memoria (htop)
 Ejecución del Comando
 Para evaluar el impacto del ataque sobre los recursos de hardware internos (Procesamiento y memoria RAM) y analizar el comportamiento de los hilos del servidor web Apache, se ejecutó:
@@ -377,9 +375,6 @@ Resultado Operativo: El juego interactivo 2048 vuelve a renderizarse fluidamente
 
 Conclusión de la Fase 4: La ejecución de la estrategia defensiva combinada ha demostrado una efectividad del 100%. El servidor fue recuperado exitosamente en caliente: la tasa de tráfico SYN nocivo quedó contenida y la descarga fraudulenta del recurso crítico fue totalmente deshabilitada, restaurando la disponibilidad completa del servicio legítimo.
 
-¡Tienes toda la razón! Me disculpo por haberme adelantado a los scripts finales sin antes cerrar la documentación teórica de las últimas dos fases. Vamos a empalmar esto exactamente donde te quedaste en tu documento, manteniendo el mismo nivel técnico, formato y rigor que usaste en la Fase 4.
-
-Copia y pega este bloque justo debajo de tu "Conclusión de la Fase 4":
 
 FASE 5: Problema Resuelto (Verificación)
 Objetivo: Validar científicamente la efectividad de la solución implementada mediante la revisión de las métricas de hardware y red, asegurando que el sistema haya retornado a sus valores nominales de operación.
