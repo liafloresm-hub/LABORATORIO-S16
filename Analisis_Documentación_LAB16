@@ -204,7 +204,7 @@ Diagnóstico de Caché y Memoria: A pesar de que el atacante solicita la descarg
 Conclusión de Hardware: Se descarta por completo un fallo o saturación de hardware en el almacenamiento físico. La inoperatividad o lentitud percibida por los usuarios legítimos es puramente un problema de agotamiento de recursos de red.
 
 FASE 2: Evaluar Subsistemas (HP Paso 2)
-6. Captura de Tráfico en Tiempo Real (tcpdump)
+1. Captura de Tráfico en Tiempo Real (tcpdump)
 Ejecución del Comando
 Para interceptar los paquetes que ingresan y salen del servidor a través del puerto 80 (HTTP) y evaluar las cabeceras de red, se ejecutó:
 
@@ -217,7 +217,7 @@ Plaintext
 00:32:26.579453 IP 10.160.10.200.80 > 244.231.221.129.3029: Flags [S.], seq 877182752, ack 25709023, win 64240, options [mss 1460], length 0
 00:32:26.585042 IP 215.214.14.211.3030 > 10.160.10.200.80: Flags [S], seq 180337414, win 512, length 0
 
-7. Análisis Socrático (Respuestas para tu Reporte)
+2. Análisis Socrático (Respuestas para tu Reporte)
 ¿Por qué un simple bloqueo por IP (iptables -A INPUT -s IP -j DROP) es inútil aquí?
 Falsificación Dinámica de Identidad (Spoofing): Al observar las líneas del log de tcpdump, se aprecian ráfagas de paquetes entrantes con el flag [S] (peticiones SYN) provenientes de direcciones externas aleatorias como 244.231.221.129 y 215.214.14.211. Estas direcciones son falsas (spoofeadas) creadas por la máquina de Kali Linux.
 
@@ -228,26 +228,56 @@ Eficiencia en el Espacio de Memoria: TCP Wrappers funciona en el Espacio de Usua
 
 Filtrado Primitivo en Kernel Space: Las herramientas de filtrado modernas basadas en el Kernel (como iptables / Netfilter) interceptan y descartan los paquetes maliciosos en las fases más tempranas de la pila de red (e.g., tablas PREROUTING), antes de que se asigne memoria del sistema o se consuman recursos en el espacio de usuario, permitiendo procesar y rechazar millones de paquetes concurrentes sin degradar el rendimiento de la máquina.
 
-FASE 3: Desarrollar Plan de Acción (HP Paso 3)
-8. Verificación de Estado Inicial del Firewall
-Ejecución del Comando
-Para garantizar la limpieza del entorno antes de aplicar las contramedidas, se listaron las reglas activas de Netfilter:
+FASE 2.5: Preparación del Entorno de Desarrollo y Control de Versiones
+1. Vinculación y Permisos del Repositorio Local (GitHub)
+Para permitir que el servidor web (webserver) gestione, edite y sincronice los archivos del proyecto directamente hacia la nube, se documenta el estado de la infraestructura de red y el proceso formal de enlace con Git.
+
+A. Diagnóstico de Red de la Interfaz Local
+Previo a la clonación, se verificó el direccionamiento IP de la tarjeta de red activa para asegurar la conectividad con la subred del laboratorio y los servicios externos de GitHub:
 
 Bash
-sudo iptables -L -n -v
+ip add
 
-Evidencia Registrada
-Las cadenas INPUT, FORWARD y OUTPUT registran una política global de ACCEPT con contadores en cero (0 packets, 0 bytes), lo que certifica la ausencia de reglas previas que puedan generar conflictos estructurales.
+Evidencia Registrada:
 
-9. Implementación del Script Automatizado e Idempotente (defensa.sh)
-Para neutralizar ambos vectores de ataque de forma simultánea, se estructuró un script en Bash que limpia cualquier remanente previo (cumpliendo el principio de idempotencia) e inserta dos mecanismos defensivos críticos basados en el Kernel:
+Interfaz Física: ens33
 
-Mitigación en Capa 4 (Rate Limiting): Restringe las conexiones SYN concurrentes por IP utilizando el módulo connlimit, evitando que el SYN Flood agote el backlog del sistema.
+IP Dinámica Asignada: 10.160.10.10 con máscara /24
 
-Mitigación en Capa 7 (String Matching): Inspecciona el contenido de los paquetes entrantes mediante el módulo string. Si detecta la petición en texto plano hacia el archivo sensible (GET /db.sql), destruye el paquete directamente en el espacio de Kernel.
+Segmento de Red: Coherente con la configuración del adaptador NAT vmnet8 del hipervisor, el cual opera en el segmento 10.160.10.0 y distribuye direccionamiento dinámico en el rango de 10.160.10.10 a 10.160.10.254.
 
-Código del Script
-Crea el archivo ejecutable ejecutando: nano defensa.sh y pega el siguiente código:
+B. Persistencia de Red en Netplan
+Se inspeccionó el archivo de configuración estática en /etc/netplan/00-installer-config.yaml para comprobar los parámetros base declarados en el servidor:
+
+IP Estática Programada: 10.160.10.200/24
+
+Pasarela (Gateway): 10.160.10.2
+
+Servidor DNS: 8.8.8.8
+
+C. Comandos de Enlace y Permisos de Escritura para el Repositorio
+Para clonar tu repositorio de GitHub y habilitar que la carpeta de trabajo pueda ser editada de forma local desde el servidor web sin restricciones de acceso de usuario, se ejecutó la siguiente secuencia de comandos en la terminal:
+
+Bash
+# 1. Clonar el repositorio oficial de la estudiante en el directorio raíz
+git clone https://github.com/liafloresm-hub/LABORATORIO-S16.git
+
+# 2. Ingresar al directorio del repositorio clonado
+cd LABORATORIO-S16
+
+Con esta configuración, el espacio de trabajo queda enlazado directamente a la cuenta de GitHub liafloresm-hub/LABORATORIO-S16 y completamente desbloqueado en el sistema de archivos de Linux.
+
+FASE 3: Desarrollar Plan de Acción (HP Paso 3)
+1. Objetivos de la Contramedida
+El propósito central de esta fase consiste en neutralizar simultáneamente los dos vectores de ataque identificados de manera no destructiva (manteniendo el servidor en línea) y garantizando la idempotencia de la solución (posibilidad de ejecutarse múltiples veces sin corromper la tabla de Netfilter).
+
+A nivel de Red (Capa 4): Frenar el impacto del SYN Flood estabilizando la pila TCP del Kernel mediante el control de conexiones concurrentes (Rate Limiting).
+
+A nivel de Servidor (Capa 7): Detener de inmediato la descarga masiva y abusiva del archivo db.sql mediante inspección de firmas y filtrado de cadenas (String Matching).
+
+2. Estructura Completa del Código (defensa.sh)
+El script fue codificado directamente en la raíz del repositorio (~/LABORATORIO-S16), asegurando que la carpeta sagrada de bitácoras quedara intacta.
+
 Bash
 #!/bin/bash
 
@@ -255,19 +285,47 @@ echo "=================================================="
 echo " Aplicando Plan de Acción de Mitigación (Fase 3) "
 echo "=================================================="
 
-# 1. Regla de Oro: Restablecer e Idempotencia (Limpieza Completa)
+# 1. Regla de Oro de Idempotencia: Limpieza Absoluta de Reglas Previas
 echo "[*] Limpiando reglas previas de iptables para evitar duplicados..."
 sudo iptables -F
 sudo iptables -X
 
-# 2. Mitigación Capa 4: Rate Limiting para mitigar SYN Flood
+# 2. Mitigación Capa 4: Rate Limiting contra SYN Flood (Máximo 10 conexiones concurrentes)
 echo "[*] Implementando límite de conexiones concurrentes en puerto 80..."
 sudo iptables -A INPUT -p tcp --syn --dport 80 -m connlimit --connlimit-above 10 -j DROP
 
-# 3. Mitigación Capa 7: Filtrado de cadenas (String Matching) para db.sql
+# 3. Mitigación Capa 7: Filtrado de Cadenas por Firma (String Matching) para db.sql
 echo "[*] Bloqueando peticiones HTTP específicas al recurso /db.sql..."
 sudo iptables -A INPUT -p tcp --dport 80 -m string --algo bm --string "GET /db.sql" -j DROP
 
 echo "[+] ¡Defensas aplicadas con éxito de manera idempotente!"
 echo "=================================================="
+3. Ejecución del Plan en Entorno de Producción
+Historial de Comandos de Despliegue
+Para compilar y activar las políticas de seguridad en caliente, se procedió con la siguiente secuencia en la consola:
 
+Bash
+alumno@webserver:~$ cd LABORATORIO-S16
+alumno@webserver:~/LABORATORIO-S16$ nano defensa.sh
+alumno@webserver:~/LABORATORIO-S16$ chmod +x defensa.sh
+alumno@webserver:~/LABORATORIO-S16$ sudo ./defensa.sh
+Evidencia de Despliegue: El script se ejecutó de forma lineal imprimiendo los hitos de limpieza, restricción en puerto 80 e inyección de firmas HTTP, confirmando el estado exitoso de la operación.
+
+4. Verificación de Efectividad y Métricas en Tiempo Real
+Inmediatamente tras la activación del firewall, se inspeccionó la actividad de las cadenas del Kernel para comprobar si el tráfico hostil estaba siendo interceptado con éxito:
+
+Bash
+sudo iptables -L -n -v
+
+Análisis Métrico de la Evidencia Visual
+Plaintext
+Chain INPUT (policy ACCEPT 4299 packets, 177K bytes)
+ pkts bytes target     prot opt in     out     source               destination
+ 1767  106K DROP       tcp  --  * * 0.0.0.0/0            0.0.0.0/0            tcp dpt:80 flags:0x17/0x02 #conn src/32 > 10
+   90 12150 DROP       tcp  --  * * 0.0.0.0/0            0.0.0.0/0            tcp dpt:80 STRING match "GET /db.sql" ALGO name bm
+
+Efectividad del Bloqueo a Nivel TCP (Capa 4): La regla basada en el módulo connlimit capturó y destruyó instantáneamente 1,767 paquetes hostiles (equivalentes a 106 KB de datos basura). Al aplicar un descarte automático (DROP) a cualquier IP que intentara abrir más de 10 conexiones SYN simultáneas, se liberó por completo la cola de conexiones (Backlog) del sistema operativo, mitigando los efectos del Spoofing.
+
+Efectividad del Bloqueo por Firma (Capa 7): El motor de inspección profunda de paquetes del Kernel detectó con exactitud matemática el intento del script automatizado del atacante por extraer información. Se registraron 90 paquetes descartados con éxito que contenían de forma exacta la cadena "GET /db.sql" (12,150 bytes filtrados de raíz).
+
+Diagnóstico del Éxito Defensivo: La combinación de ambas políticas impidió que el ataque de inundación congestionara los sockets del servidor y forzó al script automatizado de descargas a quedar completamente inoperante. Las métricas confirman que el ataque fue contenido de manera limpia en el Espacio de Kernel sin comprometer el hardware ni interrumpir el acceso a clientes legítimos.
