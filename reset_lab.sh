@@ -1,6 +1,7 @@
 #!/bin/bash
 # ==========================================
 # Script de Restauración (Regreso al inicio)
+# Autor: Lia Flores - Lab S16
 # ==========================================
 
 echo "[*] Limpiando el cortafuegos y eliminando defensas..."
